@@ -118,15 +118,17 @@ public class OperatorControls {
     //         .withName("ManualTest.Shooter")); // disabled: B = Kicker+Shooter combined
     controller.b().whileTrue(
         Commands.parallel(
+            superstructure.hopper.feedCommand(),
             superstructure.kicker.feedCommand(),
             Commands.sequence(
                 superstructure.shooter.spinUp(),
                 Commands.waitForever())
                 .finallyDo(() -> superstructure.shooter.stop().schedule()))
             .finallyDo(() -> {
+                superstructure.hopper.stopCommand().schedule();
                 superstructure.kicker.stopCommand().schedule();
                 superstructure.shooter.stop().schedule();
             })
-            .withName("ManualTest.KickerAndShooter"));
+            .withName("ManualTest.HopperKickerAndShooter"));
   }
 }
