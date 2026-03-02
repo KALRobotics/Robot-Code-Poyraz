@@ -13,6 +13,7 @@ import static edu.wpi.first.units.Units.Meter;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants;
 import frc.robot.Constants.ControllerConstants;
@@ -80,9 +81,20 @@ public class DriverControls {
           .whileTrue(superstructure.setIntakeDeployAndRoll().withName("OperatorControls.intakeDeployed"));
       controller.leftBumper().onFalse(superstructure.retractIntakeUpCommand());
 
+      // Smart Shooter Macro: spin up to match RPM, wait until at speed, then feed (avoids jams)
       controller.rightTrigger().whileTrue(
-          superstructure.feedAllCommand()
-              .finallyDo(() -> superstructure.stopFeedingAllCommand().schedule()));
+          Commands.sequence(
+              superstructure.shooter.spinUpMatchSpeed(),
+              new WaitUntilCommand(() -> superstructure.shooter.isAtTargetSpeed()),
+              Commands.parallel(
+                  superstructure.hopper.feedCommand(),
+                  superstructure.kicker.feedCommand()))
+              .finallyDo(() -> {
+                superstructure.shooter.stop().schedule();
+                superstructure.hopper.stopCommand().schedule();
+                superstructure.kicker.stopCommand().schedule();
+              })
+              .withName("DriverControls.SmartShooterMacro"));
 
 
       controller.y().onTrue(superstructure.shootCommand());

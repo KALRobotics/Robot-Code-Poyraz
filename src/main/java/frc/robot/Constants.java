@@ -76,7 +76,7 @@ public final class Constants {
     public static final double DEADBAND = 0.1;
 
     /** Global speed limit for hardware test (e.g. 0.2 = 20% max). Set to 1.0 for full speed. */
-    public static final double TEST_SPEED_MULTIPLIER = 0.2;
+    public static final double TEST_SPEED_MULTIPLIER = 1;
   }
 
   public static class DriveConstants {

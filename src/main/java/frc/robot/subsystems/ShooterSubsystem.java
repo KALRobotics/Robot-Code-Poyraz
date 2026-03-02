@@ -24,6 +24,7 @@ import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.LinearVelocity;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import yams.gearing.GearBox;
@@ -67,7 +68,28 @@ public class ShooterSubsystem extends SubsystemBase {
 
   private final FlyWheel shooter = new FlyWheel(shooterConfig);
 
+  /** Target RPM for match (full power); used by isAtTargetSpeed() and spinUpMatchSpeed(). */
+  private static final double MATCH_TARGET_RPM = 5500;
+  /** Tolerance (RPM) for considering shooter at target speed. */
+  private static final double TOLERANCE_RPM = 50;
+
   public ShooterSubsystem() {
+  }
+
+  /**
+   * Returns true when current shooter RPM is within +/- TOLERANCE_RPM of match target (5500 RPM).
+   */
+  public boolean isAtTargetSpeed() {
+    double current = getSpeed().in(RPM);
+    return Math.abs(current - MATCH_TARGET_RPM) <= TOLERANCE_RPM;
+  }
+
+  /**
+   * Starts shooter at full match speed (5500 RPM). Returns a command that schedules the setpoint
+   * and ends immediately (for use in sequences before WaitUntilCommand(isAtTargetSpeed)).
+   */
+  public Command spinUpMatchSpeed() {
+    return Commands.runOnce(() -> setSpeed(RPM.of(MATCH_TARGET_RPM)).schedule(), this);
   }
 
   public Command setSpeed(AngularVelocity speed) {
