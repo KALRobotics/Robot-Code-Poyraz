@@ -24,6 +24,7 @@ public class Robot extends LoggedRobot {
   private SimulatedArena arena;
 
   public Robot() {
+    //HEllo
     Logger.recordMetadata("ProjectName", "CA_Ri3D_2026"); // Set a metadata value
 
 
