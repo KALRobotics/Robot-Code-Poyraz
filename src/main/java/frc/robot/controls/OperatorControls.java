@@ -108,13 +108,25 @@ public class OperatorControls {
             .withName("ManualTest.IntakePivotDown"));
     controller.rightBumper().whileTrue(
         superstructure.intake.intakeCommand().withName("ManualTest.IntakeRollers"));
-    controller.x().whileTrue(
-        superstructure.kicker.feedCommand().withName("ManualTest.Kicker"));
+    // controller.x().whileTrue(
+    //     superstructure.kicker.feedCommand().withName("ManualTest.Kicker")); // disabled: B = Kicker+Shooter combined
+    // controller.b().whileTrue(
+    //     Commands.sequence(
+    //         superstructure.shooter.spinUp(),
+    //         Commands.waitForever())
+    //         .finallyDo(() -> superstructure.shooter.stop().schedule())
+    //         .withName("ManualTest.Shooter")); // disabled: B = Kicker+Shooter combined
     controller.b().whileTrue(
-        Commands.sequence(
-            superstructure.shooter.spinUp(),
-            Commands.waitForever())
-            .finallyDo(() -> superstructure.shooter.stop().schedule())
-            .withName("ManualTest.Shooter"));
+        Commands.parallel(
+            superstructure.kicker.feedCommand(),
+            Commands.sequence(
+                superstructure.shooter.spinUp(),
+                Commands.waitForever())
+                .finallyDo(() -> superstructure.shooter.stop().schedule()))
+            .finallyDo(() -> {
+                superstructure.kicker.stopCommand().schedule();
+                superstructure.shooter.stop().schedule();
+            })
+            .withName("ManualTest.KickerAndShooter"));
   }
 }
