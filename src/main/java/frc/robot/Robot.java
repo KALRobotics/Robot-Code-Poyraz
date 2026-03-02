@@ -26,6 +26,7 @@ public class Robot extends LoggedRobot {
   public Robot() {
     //HEllo
     Logger.recordMetadata("ProjectName", "CA_Ri3D_2026"); // Set a metadata value
+    //hello
 
 
 
