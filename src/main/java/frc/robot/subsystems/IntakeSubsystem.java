@@ -1,7 +1,10 @@
 package frc.robot.subsystems;
 
-import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.SparkBase.PersistMode;
+import com.revrobotics.spark.SparkBase.ResetMode;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
+import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.config.SparkMaxConfig;
 
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.system.plant.DCMotor;
@@ -43,6 +46,16 @@ public class IntakeSubsystem extends SubsystemBase {
   /** Pivot runs up (to 0°) for this long when button released; physical stop at top. */
   private static final double RETRACT_UP_SECONDS = 5.0;
 
+  /** Intake pivot: target angles (degrees) and software limits. */
+  public static final double PIVOT_UP_DEGREES = 0.0;
+  public static final double PIVOT_DOWN_DEGREES = 148.0;
+  /** Gear ratio: 5, 5, 60/18 → output degrees per motor rotation = 360 / ratio. */
+  private static final double PIVOT_GEAR_RATIO = 5.0 * 5.0 * (60.0 / 18.0);
+  /** Position PID kP for soft but stable pressure (ball pinch). */
+  private static final double PIVOT_kP = 0.1;
+  /** Smart current limit (A) to avoid burning motor when pressing on ball. */
+  private static final int PIVOT_SMART_CURRENT_LIMIT = 25;
+
   private SparkMax rollerSpark = new SparkMax(Constants.IntakeConstants.kRollerMotorId, MotorType.kBrushless);
 
   private SmartMotorControllerConfig smcConfig = new SmartMotorControllerConfig(this)
@@ -64,17 +77,17 @@ public class IntakeSubsystem extends SubsystemBase {
 
   private FlyWheel intake = new FlyWheel(intakeConfig);
 
-  // 5:1, 5:1, 60/18 reduction
+  // 5:1, 5:1, 60/18 reduction — Position PID for ball pinch (soft P, current limit 25 A)
   private SmartMotorControllerConfig intakePivotSmartMotorConfig = new SmartMotorControllerConfig(this)
       .withControlMode(ControlMode.CLOSED_LOOP)
-      .withClosedLoopController(25, 0, 0, DegreesPerSecond.of(360), DegreesPerSecondPerSecond.of(360))
+      .withClosedLoopController(PIVOT_kP, 0, 0, DegreesPerSecond.of(360), DegreesPerSecondPerSecond.of(360))
       .withFeedforward(new SimpleMotorFeedforward(0, 10, 0))
       .withTelemetry("IntakePivotMotor", TelemetryVerbosity.HIGH)
       .withGearing(new MechanismGearing(GearBox.fromReductionStages(5, 5, 60.0 / 18.0)))
       .withMotorInverted(false)
       .withIdleMode(MotorMode.COAST)
-      .withSoftLimit(Degrees.of(0), Degrees.of(150))
-      .withStatorCurrentLimit(Amps.of(10))
+      .withSoftLimit(Degrees.of(PIVOT_UP_DEGREES), Degrees.of(PIVOT_DOWN_DEGREES))
+      .withStatorCurrentLimit(Amps.of(PIVOT_SMART_CURRENT_LIMIT))
       .withClosedLoopRampRate(Seconds.of(0.1))
       .withOpenLoopRampRate(Seconds.of(0.1));
 
@@ -84,7 +97,7 @@ public class IntakeSubsystem extends SubsystemBase {
       intakePivotSmartMotorConfig);
 
   private final ArmConfig intakePivotConfig = new ArmConfig(intakePivotController)
-      .withSoftLimits(Degrees.of(0), Degrees.of(150))
+      .withSoftLimits(Degrees.of(PIVOT_UP_DEGREES), Degrees.of(PIVOT_DOWN_DEGREES))
       .withHardLimit(Degrees.of(0), Degrees.of(155))
       .withStartingPosition(Degrees.of(0))
       .withLength(Feet.of(1))
@@ -94,6 +107,20 @@ public class IntakeSubsystem extends SubsystemBase {
   private Arm intakePivot = new Arm(intakePivotConfig);
 
   public IntakeSubsystem() {
+    // Spark Max built-in: encoder in degrees, smart current limit, software limits (0–148°)
+    double degreesPerMotorRotation = 360.0 / PIVOT_GEAR_RATIO;
+    SparkMaxConfig pivotConfig = new SparkMaxConfig();
+    pivotConfig
+        .smartCurrentLimit(PIVOT_SMART_CURRENT_LIMIT)
+        .softLimit
+        .forwardSoftLimit(PIVOT_DOWN_DEGREES)
+        .forwardSoftLimitEnabled(true)
+        .reverseSoftLimit(PIVOT_UP_DEGREES)
+        .reverseSoftLimitEnabled(true);
+    pivotConfig.encoder
+        .positionConversionFactor(degreesPerMotorRotation)
+        .velocityConversionFactor(degreesPerMotorRotation / 60.0);
+    pivotMotor.configure(pivotConfig, ResetMode.kNoResetSafeParameters, PersistMode.kNoPersistParameters);
   }
 
   /**
@@ -181,10 +208,12 @@ public class IntakeSubsystem extends SubsystemBase {
   }
 
   /**
-   * Set pivot target angle (for manual test: call every cycle while button held).
+   * Set pivot target angle (clamped to software limits [0°, 148°]). Uses position PID.
    */
   public void setPivotTarget(Angle angle) {
-    intakePivotController.setPosition(angle);
+    double deg = angle.in(Degrees);
+    double clamped = Math.max(PIVOT_UP_DEGREES, Math.min(PIVOT_DOWN_DEGREES, deg));
+    intakePivotController.setPosition(Degrees.of(clamped));
   }
 
   /**
@@ -207,7 +236,7 @@ public class IntakeSubsystem extends SubsystemBase {
   }
 
   private void setIntakeDeployed() {
-    intakePivotController.setPosition(Degrees.of(148));
+    intakePivotController.setPosition(Degrees.of(PIVOT_DOWN_DEGREES));
   }
 
   @Override
