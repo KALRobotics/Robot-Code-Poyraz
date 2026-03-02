@@ -1,0 +1,392 @@
+================================================================================
+  ROBOT DEPLOYMENT & OPTIMIZATION GUIDE
+  From First Deploy to Competition-Ready
+================================================================================
+
+TABLE OF CONTENTS
+  1. AprilTag / Field Map Verification
+  2. Phase 1: Pre-Deploy Verification
+  3. Phase 2: First Enable — Wheels on Blocks
+  4. Phase 3: Floor Driving — Teleop
+  5. Phase 4: Vision Verification
+  6. Phase 5: Feedforward Characterization (SysId)
+  7. Phase 6: PathPlanner — Draw Real Paths
+  8. Phase 7: Auto-Aim Tuning
+  9. Phase 8: Competition Readiness
+  10. Common Problems Quick Reference
+
+
+================================================================================
+  1. APRILTAG / FIELD MAP VERIFICATION
+================================================================================
+
+The code uses:
+    AprilTagFieldLayout.loadField(AprilTagFields.k2026RebuiltWelded)
+
+The 2026 FRC game is called REBUILT. k2026RebuiltWelded is the official
+WPILib-provided AprilTag layout for that field. This is loaded from WPILib's
+built-in field data — no JSON file or manual tag placement needed. WPILib knows
+exactly where every AprilTag is on the 2026 Rebuilt field.
+
+Hub positions in Constants.java:
+    Red Hub:  (11.938, 4.035, 1.575) meters
+    Blue Hub: ( 4.597, 4.035, 1.575) meters
+These are symmetric across the field centerline — correct.
+
+IMPORTANT — Camera Transform:
+The robotToCamera transform in TankDriveSubsystem.java defines where the camera
+is physically mounted on YOUR robot. Current values:
+    X:     -11 inches    (11 inches behind robot center)
+    Y:      -9 inches    (9 inches to the right of center)
+    Z:    12.75 inches   (12.75 inches up from the ground)
+    Pitch:  21 degrees   (tilted upward)
+    Yaw:   180 degrees   (camera faces backward)
+
+>>> If your camera is mounted differently, you MUST update these numbers. <<<
+
+
+================================================================================
+  2. PHASE 1: PRE-DEPLOY VERIFICATION
+================================================================================
+
+[ ] 1.1   All SparkMAX controllers flashed to latest firmware
+          (use REV Hardware Client app)
+
+[ ] 1.2   CAN IDs verified and matching code:
+              1  = Left Front drive motor
+              2  = Left Back drive motor
+              3  = Right Front drive motor
+              4  = Right Back drive motor
+              5  = Shooter leader motor
+              6  = Shooter follower motor
+              7  = Turret motor
+              8  = (unused — hood removed)
+              9  = Intake pivot motor
+              10 = Intake roller motor
+              11 = Hopper motor
+              12 = Kicker motor
+
+[ ] 1.3   ADXRS450 gyro plugged into roboRIO SPI port, mounted flat
+
+[ ] 1.4   Raspberry Pi running PhotonVision, static IP set to 10.TE.AM.11
+          (replace TE.AM with your 4-digit team number split in two,
+           e.g. team 1234 → 10.12.34.11)
+
+[ ] 1.5   Camera name in PhotonVision dashboard matches "pi kamera"
+          (or update the string in TankDriveSubsystem.java to match)
+
+[ ] 1.6   Battery fully charged (>12.5V)
+
+[ ] 1.7   Breakers seated, PDP/PDH connections tight
+
+[ ] 1.8   Laptop connected to robot radio, Driver Station sees roboRIO
+
+[ ] 1.9   Code builds successfully:
+              ./gradlew build
+
+[ ] 1.10  Deploy code to robot:
+              ./gradlew deploy
+              (or use WPILib VS Code: "Deploy Robot Code")
+
+
+================================================================================
+  3. PHASE 2: FIRST ENABLE — WHEELS ON BLOCKS
+================================================================================
+
+  GOAL: Verify every motor spins the correct direction without the robot moving.
+
+[ ] 2.1   Put robot on blocks (all wheels off the ground!)
+
+[ ] 2.2   Enable teleop mode in Driver Station
+
+[ ] 2.3   Push left stick forward — BOTH sides should spin "forward"
+          PROBLEM: One side goes backward
+          FIX:    Swap .inverted(true) to the other side in TankDriveSubsystem.java
+
+[ ] 2.4   Check SmartDashboard values:
+              TankDrive/LeftVelocity   — should be POSITIVE when driving forward
+              TankDrive/RightVelocity  — should be POSITIVE when driving forward
+          PROBLEM: One reads negative
+          FIX:    Encoder phase is wrong, flip that side's motor inversion
+
+[ ] 2.5   Operator press Y button — shooter should spin up
+          Listen for both shooter motors spinning (one counter-rotating via follower)
+
+[ ] 2.6   Operator hold A button — hopper + kicker should run
+
+[ ] 2.7   Driver hold Right Bumper — intake should deploy down, roller should spin
+          Release Right Bumper — intake should retract to hold position
+
+[ ] 2.8   Operator D-Pad Up/Left/Right — turret should move to 0° / 45° / -45°
+
+[ ] 2.9   Disable robot. ALL motors should stop immediately.
+
+
+================================================================================
+  4. PHASE 3: FLOOR DRIVING — TELEOP
+================================================================================
+
+  GOAL: Drive on the ground, verify odometry tracks correctly.
+
+[ ] 3.1   Remove robot from blocks, place on flat smooth ground
+
+[ ] 3.2   Enable teleop, drive slowly forward ~3 meters in a straight line
+
+[ ] 3.3   Check SmartDashboard → TankDrive/Pose
+          X value should increase by approximately 3.0
+          PROBLEM: X decreases
+          FIX:    Both sides are inverted — flip .inverted(true) on both sides
+          PROBLEM: X changes by wrong amount (e.g. 2.1 or 4.5 instead of 3.0)
+          FIX:    Check WHEEL_DIAMETER_INCHES and GEAR_RATIO in Constants.java.
+                  Measure actual wheel diameter with calipers.
+
+[ ] 3.4   Turn robot 90° clockwise in place
+          Check TankDrive/GyroAngle — should read approximately +90
+          (the raw gyro angle increases for clockwise rotation)
+          PROBLEM: Reads -90
+          FIX:    Gyro mounted upside down — flip physically or negate in code
+          PROBLEM: Reads wildly wrong number
+          FIX:    Gyro wasn't calibrated — keep robot COMPLETELY STILL for 5
+                  seconds after power-on before enabling
+
+[ ] 3.5   Drive in a 3m square and return to starting position
+          Check pose — should be near (0, 0)
+          If it drifts more than 0.5m, feedforward constants need tuning (Phase 5)
+
+[ ] 3.6   Test curvature drive at higher speeds
+          Currently limited to 50% in DriverControls.java
+          Increase to 0.7, then 0.9 as confidence grows
+
+
+================================================================================
+  5. PHASE 4: VISION VERIFICATION
+================================================================================
+
+  GOAL: Confirm PhotonVision corrects odometry drift.
+
+[ ] 4.1   Place 1-2 AprilTags at KNOWN positions matching the 2026 field layout
+          Print tags from:
+          https://docs.wpilib.org/en/stable/docs/software/vision/apriltag/apriltag-intro.html
+          Place them at the exact field-relative position they would be on the
+          real field (measure from a wall corner if possible)
+
+[ ] 4.2   Enable teleop, point camera at a tag
+
+[ ] 4.3   Check SmartDashboard → PhotonVision/TagCount — should show >= 1
+
+[ ] 4.4   Check FieldSimulation/PhotonPose — should show a pose near the tag
+
+[ ] 4.5   Drive the robot around for 30 seconds, then return near the tag
+          TankDrive/Pose should "snap" closer to the correct position when
+          the camera sees the tag again
+          PROBLEM: Pose jumps wildly when tag is seen
+          FIX:    robotToCamera transform is wrong — measure your actual camera
+                  position (X/Y/Z from robot center, pitch/yaw angles) and
+                  update the Transform3d in TankDriveSubsystem.java
+          PROBLEM: No tag detections at all
+          FIX:    Open PhotonVision dashboard (http://photonvision.local:5800)
+                  • Verify AprilTag pipeline is selected (not reflective tape)
+                  • Camera feed should show tags with green bounding boxes
+                  • Check that camera name matches code ("photonvision")
+
+
+================================================================================
+  6. PHASE 5: FEEDFORWARD CHARACTERIZATION (SysId)
+================================================================================
+
+  GOAL: Get accurate kS, kV, kA values so autonomous paths are precise.
+
+  Current values in Constants.java are ESTIMATES:
+      kS = 0.15    (static friction voltage)
+      kV = 2.6     (velocity gain, volts per m/s)
+      kA = 0.3     (acceleration gain, volts per m/s²)
+
+[ ] 5.1   Add SysId routines to TankDriveSubsystem.java
+          WPILib provides SysIdRoutine class — bind quasistatic and dynamic
+          forward/reverse tests to controller buttons
+          Reference: https://docs.wpilib.org/en/stable/docs/software/advanced-controls/system-identification/
+
+[ ] 5.2   Run each test on a flat surface with 3+ meters of clear space
+          • Quasistatic forward (ramp up slowly going forward)
+          • Quasistatic reverse (ramp up slowly going backward)
+          • Dynamic forward (sudden step voltage forward)
+          • Dynamic reverse (sudden step voltage backward)
+
+[ ] 5.3   Import the SysId log into WPILib's SysId analysis tool
+          Read off kS, kV, kA values
+
+[ ] 5.4   Plug the new values into Constants.TankDriveConstants:
+              FEED_FORWARD_KS = <your kS>
+              FEED_FORWARD_KV = <your kV>
+              FEED_FORWARD_KA = <your kA>
+
+[ ] 5.5   Re-deploy and repeat the Phase 3 driving test
+          Odometry should now be significantly more accurate
+
+[ ] 5.6   Tune kP if needed:
+          • Robot overshoots target velocity → reduce kP
+          • Robot responds sluggishly → increase kP
+          • Start at 0.1, adjust by 0.05 increments
+
+  NOTE: If you skip this phase, autonomous will still work but paths will be
+  imprecise (robot may drift 0.5–1m off the intended path). For competition,
+  this phase is STRONGLY recommended.
+
+
+================================================================================
+  7. PHASE 6: PATHPLANNER — DRAW REAL PATHS
+================================================================================
+
+  GOAL: Create autonomous routines for your actual competition strategy.
+
+[ ] 6.1   Install PathPlanner desktop app
+          https://pathplanner.dev
+
+[ ] 6.2   Open your project in PathPlanner
+          It reads from: src/main/deploy/pathplanner/
+
+[ ] 6.3   Verify settings.json has correct robot dimensions
+          (currently set to: 0.546m track width, 6.75 gearing, NEO motors)
+
+[ ] 6.4   Delete or ignore the old paths:
+              pathplanner/paths/*.path    — made for swerve robot, wrong field
+              pathplanner/autos/*.auto    — made for swerve robot, wrong field
+
+[ ] 6.5   Draw NEW paths for YOUR starting positions and strategy:
+          • Where does the robot start? (left / center / right of alliance wall)
+          • Where does it drive to score?
+          • Where does it pick up game pieces?
+          • Draw waypoints with appropriate velocities and heading constraints
+
+[ ] 6.6   Create auto routines that combine paths + commands:
+          Example: follow path to hub → spin up shooter → aim → feed → score
+
+[ ] 6.7   Add real named commands in RobotContainer.buildNamedAutoCommands()
+          Replace the placeholder commands:
+              "ScoreCoral"  → currently just prints to console, does nothing
+              "Dealgae"     → currently just prints to console, does nothing
+          Replace with actual shooter/turret/feed command sequences from
+          your Superstructure class
+
+[ ] 6.8   Test each auto on the field
+          Robot MUST start at the exact correct position for each auto
+          (PathPlanner paths have a starting pose — match it)
+
+
+================================================================================
+  8. PHASE 7: AUTO-AIM TUNING
+================================================================================
+
+  GOAL: Make the shoot-on-the-move system accurate.
+
+[ ] 7.1   Place robot at exactly 2m from the hub, enable auto-aim, fire
+          Does the ball go in?
+          If not → adjust the 2700 RPM entry in
+          ShootOnTheMoveCommand.SHOOTING_SPEED_BY_DISTANCE
+
+[ ] 7.2   Repeat at 3m, 4m, and 5m
+          Adjust RPM values at each distance
+
+[ ] 7.3   Add MORE data points to the range table
+          More entries = smoother interpolation = more accurate shots
+          Currently only has entries at 2m and 5m — add 1m, 3m, 4m, 6m, 7m
+
+[ ] 7.4   Test while slowly driving
+          Does the lead correction work?
+          If balls consistently miss in the direction of travel →
+          the TIME_OF_FLIGHT_BY_DISTANCE table needs tuning
+
+[ ] 7.5   Hood tuning (if you have hood hardware):
+          The hood is currently DISABLED (returns 0° always)
+          If you have a hood mechanism:
+              • Uncomment real encoder reading in HoodSubsystem.java
+              • Add hood angle entries to HOOD_ANGLE_BY_DISTANCE
+              • Tune at each distance for optimal launch angle
+
+
+================================================================================
+  9. PHASE 8: COMPETITION READINESS
+================================================================================
+
+[ ] 8.1   Run full match simulation:
+          15 seconds autonomous → 2 minutes 15 seconds teleop
+          Complete a full cycle without issues
+
+[ ] 8.2   Verify no brownouts during heavy use
+          Battery should stay above 7V
+          PROBLEM: Brownouts occur
+          FIX:    Reduce current limits or stagger motor startup
+                  (don't run all 12 motors at maximum simultaneously)
+
+[ ] 8.3   Verify auto-aim works from all angles within turret ±90° range
+
+[ ] 8.4   Verify alliance detection works when connected to FMS
+          (at competition, the Field Management System sets your alliance color)
+
+[ ] 8.5   Set drive scaling to your final competition value
+          Currently 0.5 (50% speed) in DriverControls.java
+          Competition teams typically use 0.85–1.0
+
+[ ] 8.6   Practice driver/operator coordination:
+          • Driver positions the robot
+          • Operator aims turret and fires
+          • Practice handoff timing
+
+[ ] 8.7   Have a backup autonomous that just drives forward
+          In case complex autos fail at competition, a simple "drive forward
+          and score one piece" auto is worth guaranteed points
+
+
+================================================================================
+  10. COMMON PROBLEMS QUICK REFERENCE
+================================================================================
+
+SYMPTOM                          | CAUSE                      | FIX
+---------------------------------|----------------------------|----------------------------------
+Robot drives in circles          | Wrong side inverted         | Swap .inverted(true) to other side
+Robot barely moves / shakes      | Follower fighting leader    | Remove .inverted(true) from follower
+Odometry drifts badly            | Wrong wheel dia or gear     | Measure wheel, verify gear ratio
+                                 | ratio                       |
+Gyro reads wrong angles          | Robot moved during          | Keep still 5s after power on
+                                 | calibration                 |
+Gyro reads opposite sign         | Mounted upside down         | Flip physically or negate in code
+Auto path overshoots corners     | kV too low                  | Run SysId, update feedforward
+Auto path undershoots             | kV too high                 | Run SysId, update feedforward
+Vision pose jumps wildly         | Camera transform wrong      | Re-measure camera X/Y/Z and angles
+No AprilTag detections           | Wrong pipeline              | PhotonVision dashboard: select
+                                 |                             | AprilTag pipeline
+Turret doesn't move              | Not zeroed                  | Press operator Start to re-zero
+Shooter balls miss consistently  | Range table wrong           | Test at known distances, update RPM
+Brownout on enable               | Too many motors at once     | Reduce current limits or stagger
+"No auto selected"               | SmartDashboard not set      | Select auto from dropdown before
+                                 |                             | enabling
+Robot does nothing in auto       | AutoBuilder failed          | Check console for "Failed to load
+                                 |                             | PathPlanner RobotConfig" error
+Intake doesn't retract           | Pivot PID not tuned         | Check pivot kP / setpoint in
+                                 |                             | IntakeSubsystem.java
+Robot veers to one side          | One side has more friction  | Trim with small offset or check
+                                 | or different wheel wear     | wheel condition
+Code deploys but robot doesn't   | Wrong team number or radio  | Check team # in .wpilib/wpilib_
+respond                          | not configured              | preferences.json, re-image radio
+SparkMAX blinks orange           | Not receiving CAN commands  | Check CAN wiring, verify CAN ID
+                                 |                             | in REV Hardware Client
+
+
+================================================================================
+  TESTING MILESTONE SUMMARY
+================================================================================
+
+  Milestone 1: Motors spin correct direction (Phase 2)
+  Milestone 2: Odometry tracks 3m straight drive accurately (Phase 3)
+  Milestone 3: Gyro heading matches physical rotation (Phase 3)
+  Milestone 4: AprilTag detections visible, pose updates stable (Phase 4)
+  Milestone 5: SysId complete, feedforward constants tuned (Phase 5)
+  Milestone 6: New PathPlanner paths drawn and tested (Phase 6)
+  Milestone 7: Auto-aim hits target from 3+ distances (Phase 7)
+  Milestone 8: Full match simulation without brownouts (Phase 8)
+  Milestone 9: Competition-ready with backup autonomous (Phase 8)
+
+
+================================================================================
+  END OF GUIDE
+================================================================================

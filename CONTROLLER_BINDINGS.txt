@@ -1,0 +1,293 @@
+================================================================================
+  CONTROLLER BINDINGS — STEP-BY-STEP
+  Driver (port 0) and Operator (port 1)
+================================================================================
+
+TABLE OF CONTENTS
+  1. Driver (port 0) — bindings
+  2. Operator (port 1) — bindings
+  3. Summary table
+  4. Intake / hopper / kicker angles reference
+
+
+================================================================================
+  1. DRIVER (PORT 0)
+================================================================================
+
+--------------------------------------------------------------------------------
+  LEFT STICK + RIGHT STICK (always active — default command)
+--------------------------------------------------------------------------------
+
+  Left stick Y (forward/back):
+    • Pull back  = drive forward (scaled to 50% max)
+    • Push forward = drive backward
+    • In deadband (~10%) = no drive
+
+  Right stick X:
+    • Right = turn right, Left = turn left (scaled to 50%)
+    • If throttle is in deadband, same stick does quick-turn (turn in place)
+
+--------------------------------------------------------------------------------
+  START (press once — onTrue)
+--------------------------------------------------------------------------------
+
+  When you press:
+    • One shot.
+  What happens:
+    • Gyro is zeroed; current pose heading is set to 0°.
+    • Odometry "forward" is now whatever direction the robot is facing.
+  After:
+    • Nothing else; you can drive as normal.
+
+--------------------------------------------------------------------------------
+  LEFT BUMPER (hold / release — whileTrue)
+--------------------------------------------------------------------------------
+
+  While you hold:
+    1. Feed-all runs: hopper and kicker both run forward
+       (hopper ~70%, kicker 100%).
+    2. Balls move from hopper toward kicker and into the shooter path.
+
+  When you release:
+    1. Feed-all command ends.
+    2. Its finallyDo runs and schedules stop-feeding-all.
+    3. Stop-feeding-all runs: hopper and kicker set to 0% and stop.
+
+  Result: Hold = feed balls into shooter; release = everything stops.
+
+--------------------------------------------------------------------------------
+  RIGHT BUMPER (hold / release — whileTrue)
+--------------------------------------------------------------------------------
+
+  While you hold:
+    1. Intake pivot is commanded to 148° (deployed down).
+    2. Intake roller runs at 60% (pulling in).
+    3. Every cycle the command keeps re-commanding 148° and roller speed.
+
+  When you release:
+    1. Roller is set to 0% and stops immediately.
+    2. Intake pivot is commanded to 115° (hold/retract).
+    3. Pivot moves from 148° up to 115° and stays there.
+
+  Result: Hold = intake down and rolling to pick up; release = roller stops
+          and intake comes up to 115°.
+
+--------------------------------------------------------------------------------
+  BACK (simulation only)
+--------------------------------------------------------------------------------
+
+  While you hold:
+    • Every 0.1 s a simulated "fuel" projectile is fired from the current
+      shooter pose with current aim and shooter speed.
+  When you release:
+    • No more projectiles spawned.
+  Note: Not used in teleop on the real robot.
+
+--------------------------------------------------------------------------------
+  Y (test mode only)
+--------------------------------------------------------------------------------
+
+  When you press:
+    • Same as START — one-shot gyro zero.
+  Note: Only active when the robot is in Test mode.
+
+
+================================================================================
+  2. OPERATOR (PORT 1)
+================================================================================
+
+--------------------------------------------------------------------------------
+  START (press once — onTrue)
+--------------------------------------------------------------------------------
+
+  When you press:
+    • One shot.
+  What happens:
+    • Turret encoder is set to 0 (current position becomes "0°").
+    • Intake pivot encoder is set to 0 (current position becomes "0°").
+  After:
+    • Both mechanisms keep running; only the zero reference is updated.
+  Use when: Turret and intake are in a known physical position and you want
+            that to be the new zero.
+
+--------------------------------------------------------------------------------
+  RIGHT BUMPER (hold / release — whileTrue)
+--------------------------------------------------------------------------------
+
+  Same as driver right bumper:
+    • While held: intake to 148°, roller at 60%.
+    • When released: roller stops, pivot goes to 115°.
+
+--------------------------------------------------------------------------------
+  Y (press once — onTrue)
+--------------------------------------------------------------------------------
+
+  When you press:
+    • One shot.
+  What happens:
+    • Shooter is commanded to 5500 RPM; the command ends.
+    • Shooter keeps spinning at 5500 RPM until something else changes it
+      (e.g. X or stop-all).
+  After:
+    • No timeout; shooter stays at 5500 RPM.
+  Typical use: Press Y to spin up, then use A to feed and shoot; use X when
+               done to stop the shooter.
+
+--------------------------------------------------------------------------------
+  X (hold / release — whileTrue)
+--------------------------------------------------------------------------------
+
+  While you hold:
+    • Shooter is commanded to 0 RPM; it spins down and stays at 0.
+  When you release:
+    • Command ends; shooter stays at 0 (command does not turn it back on).
+  Result: Hold X to spin down and keep shooter off; release when done.
+
+--------------------------------------------------------------------------------
+  A (hold / release — whileTrue)
+--------------------------------------------------------------------------------
+
+  While you hold:
+    1. Feed-all runs: hopper and kicker both run forward (same as driver
+       left bumper).
+    2. Balls move from hopper through kicker toward the shooter.
+
+  When you release:
+    1. Feed-all ends.
+    2. Its finallyDo schedules stop-feeding-all.
+    3. Hopper and kicker set to 0% and stop.
+
+  Result: Same "hold to feed, release to stop" as driver left bumper.
+
+--------------------------------------------------------------------------------
+  B (hold / release — whileTrue)
+--------------------------------------------------------------------------------
+
+  While you hold:
+    1. Back-feed-all runs:
+       • Hopper runs reverse (~70% reverse).
+       • Intake is deployed to 148° and roller runs reverse (60% reverse).
+    2. Balls/game pieces are driven backward (e.g. out of hopper/intake).
+
+  When you release:
+    1. Back-feed-all ends.
+    2. Its finallyDo schedules stop-feeding-all (hopper and kicker stop).
+    3. Intake's finallyDo also runs: roller stops, pivot goes to 115°.
+
+  Result: Hold = unjam or spit out from hopper/intake; release = everything
+          stops and intake comes up to 115°.
+
+--------------------------------------------------------------------------------
+  POV UP (press once — onTrue)
+--------------------------------------------------------------------------------
+
+  When you press:
+    • One shot.
+  What happens:
+    • Turret is commanded to 0° (forward).
+    • A turret command runs until the turret reaches 0° (or is interrupted).
+  After:
+    • Turret holds at 0°.
+
+--------------------------------------------------------------------------------
+  POV LEFT (press once — onTrue)
+--------------------------------------------------------------------------------
+
+  When you press:
+    • Turret is commanded to +45° (left).
+    • Same as POV Up; turret moves there and holds.
+
+--------------------------------------------------------------------------------
+  POV RIGHT (press once — onTrue)
+--------------------------------------------------------------------------------
+
+  When you press:
+    • Turret is commanded to -45° (right).
+    • Turret moves there and holds.
+
+--------------------------------------------------------------------------------
+  LEFT BUMPER (toggle — toggleOnTrue)
+--------------------------------------------------------------------------------
+
+  First press (turn on):
+    1. ShootOnTheMoveCommand starts and does not end on its own.
+    2. It immediately schedules aim-dynamic: shooter speed and turret angle
+       are continuously updated from this command (not fixed values).
+    3. Every cycle it:
+       • Reads the current aim point (e.g. hub).
+       • Computes distance, time of flight, and motion correction.
+       • Updates desired shooter RPM and turret angle and sends them to
+         the superstructure.
+    4. Shooter and turret track the moving aim (e.g. for shooting while
+       driving).
+
+  Second press (turn off):
+    1. ShootOnTheMoveCommand ends (interrupted or cancelled).
+    2. In end() it cancels the aim-dynamic command.
+    3. Shooter and turret stop following the auto aim; they stay at whatever
+       they were last commanded (no automatic stop unless you press X or
+       run another command).
+
+  Result: Toggle on = continuous "shoot on the move" auto-aim; toggle off =
+          stop auto-aim; shooter/turret stay where they were.
+
+
+================================================================================
+  3. SUMMARY TABLE
+================================================================================
+
+  Controller   Button        Trigger     While active        When released / after
+  ----------   ----------   ----------  ------------------   ------------------------
+  Driver       Left stick    (default)   Curvature drive      —
+  Driver       START         onTrue     —                    Gyro zeroed once
+  Driver       Left bumper   whileTrue   Hopper + kicker     Stop both (stopFeedingAll)
+                                         feed
+  Driver       Right bumper  whileTrue   Intake 148°,        Roller 0, intake to 115°
+                                         roller in
+  Driver       Back          whileTrue   Fire sim fuel       Stops firing
+                (sim only)               every 0.1 s
+  Operator     START         onTrue      —                    Rezero turret + intake
+                                                             pivot once
+  Operator     Right bumper  whileTrue   Same as driver      Same as driver
+                                         right bumper
+  Operator     Y             onTrue      —                    Shooter to 5500 RPM
+                                                             (stays)
+  Operator     X             whileTrue   Shooter to 0 RPM     Shooter stays at 0
+  Operator     A             whileTrue   Hopper + kicker     Stop both
+                                         feed
+  Operator     B             whileTrue   Hopper reverse +    All stop, intake to 115°
+                                         intake deploy +
+                                         roller reverse
+  Operator     POV Up        onTrue      —                    Turret to 0°
+  Operator     POV Left      onTrue      —                    Turret to +45°
+  Operator     POV Right     onTrue      —                    Turret to -45°
+  Operator     Left bumper   toggle      Shoot-on-the-move   Second press: cancel
+                                         auto-aim (shooter   auto-aim; last setpoints
+                                         + turret track      kept
+                                         aim point)
+
+
+================================================================================
+  4. INTAKE / HOPPER / KICKER ANGLES REFERENCE
+================================================================================
+
+  Intake pivot positions (IntakeSubsystem):
+    0°   = stow (fully up)
+    59°  = feed position
+    115° = hold / retract (used when you release deploy)
+    148° = deployed (down for picking up from ground)
+
+  Hopper / Kicker:
+    • No physical angles; they only run forward (feed) or reverse (back-feed).
+    • Speeds: hopper ~70%, kicker 100% when feeding.
+
+  Turret:
+    0°   = forward (POV Up)
+    +45° = left (POV Left)
+    -45° = right (POV Right)
+    Range: ±90° (soft limits in TurretSubsystem)
+
+
+================================================================================
+  END OF CONTROLLER BINDINGS
+================================================================================
