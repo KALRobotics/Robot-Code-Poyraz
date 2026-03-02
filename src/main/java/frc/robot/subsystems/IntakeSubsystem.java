@@ -54,7 +54,11 @@ public class IntakeSubsystem extends SubsystemBase {
   /** Position PID kP for soft but stable pressure (ball pinch). */
   private static final double PIVOT_kP = 0.1;
   /** Smart current limit (A) to avoid burning motor when pressing on ball. */
-  private static final int PIVOT_SMART_CURRENT_LIMIT = 25;
+  private static final int PIVOT_SMART_CURRENT_LIMIT = 20;
+  /** Fixed duty for software-limited voltage control: down (no PID oscillation). */
+  public static final double PIVOT_DOWN_DUTY = -0.20;
+  /** Fixed duty for software-limited voltage control: up. */
+  public static final double PIVOT_UP_DUTY = 0.30;
 
   private SparkMax rollerSpark = new SparkMax(Constants.IntakeConstants.kRollerMotorId, MotorType.kBrushless);
 
@@ -221,6 +225,24 @@ public class IntakeSubsystem extends SubsystemBase {
    */
   public void holdPivot() {
     holdCurrentPivotPosition();
+  }
+
+  /**
+   * Current pivot angle in degrees (from encoder). Used for software limits in voltage control.
+   */
+  public double getPivotAngleDegrees() {
+    return pivotMotor.getEncoder().getPosition();
+  }
+
+  /**
+   * Software-limited voltage control: apply duty cycle but cut power at 0° (up) and 148° (down).
+   * Use for D-Pad control to avoid PID oscillation. Call with 0 to stop motor.
+   */
+  public void setPivotDutyCycleWithLimits(double duty) {
+    double a = getPivotAngleDegrees();
+    if (duty < 0 && a >= PIVOT_DOWN_DEGREES) duty = 0;
+    if (duty > 0 && a <= PIVOT_UP_DEGREES) duty = 0;
+    pivotMotor.set(duty);
   }
 
   /**

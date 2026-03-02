@@ -98,14 +98,14 @@ public class OperatorControls {
     //         .ignoringDisable(true)
     //         .withName("OperatorControls.aimCommand")); // disabled: double binding; RB = ManualTest.IntakeRollers only
 
-    // ----- Intake pivot: D-Pad Up = 0° (stow), D-Pad Down = 148° (down); release = hold current -----
+    // ----- Intake pivot: software-limited voltage control (no PID oscillation); release = stop motor -----
     controller.povUp().whileTrue(
-        Commands.run(() -> superstructure.intake.setPivotTarget(Degrees.of(IntakeSubsystem.PIVOT_UP_DEGREES)), superstructure.intake)
-            .finallyDo(superstructure.intake::holdPivot)
+        Commands.run(() -> superstructure.intake.setPivotDutyCycleWithLimits(IntakeSubsystem.PIVOT_UP_DUTY), superstructure.intake)
+            .finallyDo(() -> superstructure.intake.setPivotDutyCycleWithLimits(0))
             .withName("OperatorControls.IntakePivotUp"));
     controller.povDown().whileTrue(
-        Commands.run(() -> superstructure.intake.setPivotTarget(Degrees.of(IntakeSubsystem.PIVOT_DOWN_DEGREES)), superstructure.intake)
-            .finallyDo(superstructure.intake::holdPivot)
+        Commands.run(() -> superstructure.intake.setPivotDutyCycleWithLimits(IntakeSubsystem.PIVOT_DOWN_DUTY), superstructure.intake)
+            .finallyDo(() -> superstructure.intake.setPivotDutyCycleWithLimits(0))
             .withName("OperatorControls.IntakePivotDown"));
     controller.rightBumper().whileTrue(
         superstructure.intake.intakeCommand().withName("ManualTest.IntakeRollers"));

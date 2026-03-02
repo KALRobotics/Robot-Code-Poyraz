@@ -68,20 +68,20 @@ public class ShooterSubsystem extends SubsystemBase {
 
   private final FlyWheel shooter = new FlyWheel(shooterConfig);
 
-  /** Target RPM for match (full power); used by isAtTargetSpeed() and spinUpMatchSpeed(). */
+  /** Target RPM for match (full power); used by spinUpMatchSpeed(). */
   private static final double MATCH_TARGET_RPM = 5500;
-  /** Tolerance (RPM) for considering shooter at target speed. */
-  private static final double TOLERANCE_RPM = 50;
+  /** RPM threshold for Smart Shooter Macro: feed (hopper/kicker) starts when speed reaches this (earlier than 5500). */
+  public static final double SHOOTER_FEED_THRESHOLD_RPM = 4200;
 
   public ShooterSubsystem() {
   }
 
   /**
-   * Returns true when current shooter RPM is within +/- TOLERANCE_RPM of match target (5500 RPM).
+   * Returns true when shooter has reached feed threshold (4200 RPM). Smart Shooter Macro feeds at this speed
+   * instead of waiting for full 5500 RPM to save time.
    */
   public boolean isAtTargetSpeed() {
-    double current = getSpeed().in(RPM);
-    return Math.abs(current - MATCH_TARGET_RPM) <= TOLERANCE_RPM;
+    return getSpeed().in(RPM) >= SHOOTER_FEED_THRESHOLD_RPM;
   }
 
   /**
