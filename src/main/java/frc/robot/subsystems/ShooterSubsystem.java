@@ -70,23 +70,13 @@ public class ShooterSubsystem extends SubsystemBase {
 
   /** Target RPM for match (full power); used by spinUpMatchSpeed(). */
   private static final double MATCH_TARGET_RPM = 5500;
-  /** RPM threshold for Smart Shooter Macro: feed (hopper/kicker) starts when speed reaches this (earlier than 5500). */
-  public static final double SHOOTER_FEED_THRESHOLD_RPM = 4200;
 
   public ShooterSubsystem() {
   }
 
   /**
-   * Returns true when shooter has reached feed threshold (4200 RPM). Smart Shooter Macro feeds at this speed
-   * instead of waiting for full 5500 RPM to save time.
-   */
-  public boolean isAtTargetSpeed() {
-    return getSpeed().in(RPM) >= SHOOTER_FEED_THRESHOLD_RPM;
-  }
-
-  /**
    * Starts shooter at full match speed (5500 RPM). Returns a command that schedules the setpoint
-   * and ends immediately (for use in sequences before WaitUntilCommand(isAtTargetSpeed)).
+   * and ends immediately (for use in time-based macro with WaitCommand).
    */
   public Command spinUpMatchSpeed() {
     return Commands.runOnce(() -> setSpeed(RPM.of(MATCH_TARGET_RPM)).schedule(), this);

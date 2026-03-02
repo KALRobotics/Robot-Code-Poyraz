@@ -68,14 +68,22 @@ public class OperatorControls {
 
     // REAL CONTROLS
     controller.start().onTrue(superstructure.rezeroIntakePivotAndTurretCommand().ignoringDisable(true));
-    
-    controller.rightTrigger().whileTrue(superstructure.turret.addAngle(Degrees.of(0.1)));
 
-    controller.leftTrigger().whileTrue(superstructure.turret.addAngle(Degrees.of(-0.1)));
+    // Taret manuel test: tetikler çok düşük adımla (0.05°) sağa/sola; bırakınca dur
+    controller.rightTrigger().whileTrue(superstructure.turret.addAngle(Degrees.of(0.05)));
+    controller.leftTrigger().whileTrue(superstructure.turret.addAngle(Degrees.of(-0.05)));
 
     controller.leftBumper()
         .whileTrue(superstructure.setIntakeDeployAndRoll().withName("OperatorControls.intakeDeployed"));
     controller.leftBumper().onFalse(superstructure.retractIntakeUpCommand());
+
+    // Sıkışma çözücü: Back basılı = Hopper + Intake roller ters; bırakınca dur
+    controller.back().whileTrue(
+        Commands.parallel(
+            superstructure.hopper.backFeedCommand(),
+            superstructure.intake.ejectCommand())
+            .finallyDo(() -> superstructure.hopper.stopCommand().schedule())
+            .withName("OperatorControls.JamClear"));
 
     controller.y().onTrue(superstructure.shootCommand());
     // controller.x().whileTrue(superstructure.stopShootingCommand()); // disabled: double binding; X = ManualTest.Kicker only
@@ -98,7 +106,7 @@ public class OperatorControls {
     //         .ignoringDisable(true)
     //         .withName("OperatorControls.aimCommand")); // disabled: double binding; RB = ManualTest.IntakeRollers only
 
-    // ----- Intake pivot: software-limited voltage control (no PID oscillation); release = stop motor -----
+    // Intake pivot: manuel sabit güç; D-Pad Yukarı/Aşağı basılı = yukarı/aşağı, bırakınca dur
     controller.povUp().whileTrue(
         Commands.run(() -> superstructure.intake.setPivotDutyCycleWithLimits(IntakeSubsystem.PIVOT_UP_DUTY), superstructure.intake)
             .finallyDo(() -> superstructure.intake.setPivotDutyCycleWithLimits(0))
@@ -107,8 +115,9 @@ public class OperatorControls {
         Commands.run(() -> superstructure.intake.setPivotDutyCycleWithLimits(IntakeSubsystem.PIVOT_DOWN_DUTY), superstructure.intake)
             .finallyDo(() -> superstructure.intake.setPivotDutyCycleWithLimits(0))
             .withName("OperatorControls.IntakePivotDown"));
+    // Top alma: RB = Intake roller içeri; bırakınca dur
     controller.rightBumper().whileTrue(
-        superstructure.intake.intakeCommand().withName("ManualTest.IntakeRollers"));
+        superstructure.intake.intakeCommand().withName("OperatorControls.IntakeRoller"));
     // controller.x().whileTrue(
     //     superstructure.kicker.feedCommand().withName("ManualTest.Kicker")); // disabled: B = Kicker+Shooter combined
     // controller.b().whileTrue(

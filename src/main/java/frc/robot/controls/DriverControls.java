@@ -13,7 +13,6 @@ import static edu.wpi.first.units.Units.Meter;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants;
 import frc.robot.Constants.ControllerConstants;
@@ -74,22 +73,25 @@ public class DriverControls {
     } else {
       // Teleop controls
       controller.start().onTrue(Commands.runOnce(drivetrain::zeroGyro));
+      // Top alma: RB = Intake roller içeri; bırakınca dur
       controller.rightBumper().whileTrue(
-          superstructure.feedAllCommand()
-              .finallyDo(() -> superstructure.stopFeedingAllCommand().schedule()));
+          superstructure.intake.intakeCommand().withName("DriverControls.IntakeRoller"));
 
       controller.leftBumper()
-          .whileTrue(superstructure.setIntakeDeployAndRoll().withName("OperatorControls.intakeDeployed"));
+          .whileTrue(superstructure.setIntakeDeployAndRoll().withName("DriverControls.intakeDeployed"));
       controller.leftBumper().onFalse(superstructure.retractIntakeUpCommand());
 
-      // Smart Shooter Macro: spin up to match RPM, wait until at speed, then feed (avoids jams)
+      // Akıllı atış: tetikte Shooter hemen, 1 saniye sonra Hopper+Kicker; bırakınca hepsi dur
       controller.rightTrigger().whileTrue(
-          Commands.sequence(
-              superstructure.shooter.spinUpMatchSpeed(),
-              new WaitUntilCommand(() -> superstructure.shooter.isAtTargetSpeed()),
-              Commands.parallel(
-                  superstructure.hopper.feedCommand(),
-                  superstructure.kicker.feedCommand()))
+          Commands.parallel(
+              Commands.sequence(
+                  superstructure.shooter.spinUpMatchSpeed(),
+                  Commands.waitForever()),
+              Commands.sequence(
+                  Commands.waitSeconds(1.0),
+                  Commands.parallel(
+                      superstructure.hopper.feedCommand(),
+                      superstructure.kicker.feedCommand())))
               .finallyDo(() -> {
                 superstructure.shooter.stop().schedule();
                 superstructure.hopper.stopCommand().schedule();
