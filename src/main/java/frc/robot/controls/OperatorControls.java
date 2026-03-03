@@ -69,13 +69,13 @@ public class OperatorControls {
     // REAL CONTROLS
     controller.start().onTrue(superstructure.rezeroIntakePivotAndTurretCommand().ignoringDisable(true));
 
-    // Taret manuel test: RT sağa, LT sola (0.05°); bırakınca motor ANINDA dur (set(0))
+    // Taret manuel test: RT sağa, LT sola (0.05°); bırakınca motor 0'da tutulur (sürekli stopMotor)
     controller.rightTrigger().whileTrue(
         superstructure.turret.addAngle(Degrees.of(0.05))
-            .finallyDo(() -> superstructure.turret.set(0).schedule()));
+            .finallyDo(() -> Commands.run(superstructure.turret::stopMotor, superstructure.turret).schedule()));
     controller.leftTrigger().whileTrue(
         superstructure.turret.addAngle(Degrees.of(-0.05))
-            .finallyDo(() -> superstructure.turret.set(0).schedule()));
+            .finallyDo(() -> Commands.run(superstructure.turret::stopMotor, superstructure.turret).schedule()));
 
     controller.leftBumper()
         .whileTrue(superstructure.setIntakeDeployAndRoll().withName("OperatorControls.intakeDeployed"));
@@ -136,7 +136,7 @@ public class OperatorControls {
             superstructure.kicker.feedCommand(),
             Commands.sequence(
                 superstructure.shooter.spinUp(),
-                Commands.waitForever())
+                Commands.run(() -> {}, superstructure.shooter))
                 .finallyDo(() -> superstructure.shooter.stop().schedule()))
             .finallyDo(() -> {
                 superstructure.hopper.stopCommand().schedule();

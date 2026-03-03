@@ -108,6 +108,11 @@ public class TurretSubsystem extends SubsystemBase {
     return turret.set(dutyCycle * Constants.ControllerConstants.TEST_SPEED_MULTIPLIER);
   }
 
+  /** Motor çıkışını 0 yapar; tetik bırakıldığında anında durması için doğrudan Spark'a yazar. */
+  public void stopMotor() {
+    spark.set(0);
+  }
+
   public Command rezero() {
     return Commands.runOnce(() -> spark.getEncoder().setPosition(0), this).withName("Turret.Rezero");
   }
