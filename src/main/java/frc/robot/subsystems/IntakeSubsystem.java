@@ -51,13 +51,13 @@ public class IntakeSubsystem extends SubsystemBase {
   public static final double PIVOT_DOWN_DEGREES = 148.0;
   /** Gear ratio: 5, 5, 60/18 → output degrees per motor rotation = 360 / ratio. */
   private static final double PIVOT_GEAR_RATIO = 5.0 * 5.0 * (60.0 / 18.0);
-  /** Position PID kP for soft but stable pressure (ball pinch). */
-  private static final double PIVOT_kP = 0.1;
-  /** Smart current limit (A) to avoid burning motor when pressing on ball. */
-  private static final int PIVOT_SMART_CURRENT_LIMIT = 20;
-  /** Fixed duty for software-limited voltage control: down (no PID oscillation). */
+  /** Position PID kP for lock (dynamic setpoint); soft to avoid oscillation. */
+  private static final double PIVOT_LOCK_kP = 0.05;
+  /** Smart current limit (A) when pressing on ball. */
+  private static final int PIVOT_SMART_CURRENT_LIMIT = 25;
+  /** Manual drive duty: down. */
   public static final double PIVOT_DOWN_DUTY = -0.20;
-  /** Fixed duty for software-limited voltage control: up. */
+  /** Manual drive duty: up. */
   public static final double PIVOT_UP_DUTY = 0.30;
 
   private SparkMax rollerSpark = new SparkMax(Constants.IntakeConstants.kRollerMotorId, MotorType.kBrushless);
@@ -81,10 +81,10 @@ public class IntakeSubsystem extends SubsystemBase {
 
   private FlyWheel intake = new FlyWheel(intakeConfig);
 
-  // 5:1, 5:1, 60/18 reduction — Position PID for ball pinch (soft P, current limit 25 A)
+  // 5:1, 5:1, 60/18 — Position PID for lock (PIVOT_LOCK_kP), current limit 25 A
   private SmartMotorControllerConfig intakePivotSmartMotorConfig = new SmartMotorControllerConfig(this)
       .withControlMode(ControlMode.CLOSED_LOOP)
-      .withClosedLoopController(PIVOT_kP, 0, 0, DegreesPerSecond.of(360), DegreesPerSecondPerSecond.of(360))
+      .withClosedLoopController(PIVOT_LOCK_kP, 0, 0, DegreesPerSecond.of(360), DegreesPerSecondPerSecond.of(360))
       .withFeedforward(new SimpleMotorFeedforward(0, 10, 0))
       .withTelemetry("IntakePivotMotor", TelemetryVerbosity.HIGH)
       .withGearing(new MechanismGearing(GearBox.fromReductionStages(5, 5, 60.0 / 18.0)))
@@ -235,14 +235,28 @@ public class IntakeSubsystem extends SubsystemBase {
   }
 
   /**
-   * Software-limited voltage control: apply duty cycle but cut power at 0° (up) and 148° (down).
-   * Use for D-Pad control to avoid PID oscillation. Call with 0 to stop motor.
+   * Manual open-loop drive: motor runs at duty. Respects software limits (0° and 148°).
+   * Use lockPosition() when releasing D-Pad to hold at current angle.
    */
-  public void setPivotDutyCycleWithLimits(double duty) {
+  public void manualDrive(double duty) {
     double a = getPivotAngleDegrees();
     if (duty < 0 && a >= PIVOT_DOWN_DEGREES) duty = 0;
     if (duty > 0 && a <= PIVOT_UP_DEGREES) duty = 0;
     pivotMotor.set(duty);
+  }
+
+  /**
+   * Set current angle as position PID target (dynamic setpoint). Call when releasing D-Pad.
+   */
+  public void lockPosition() {
+    double currentAngle = getPivotAngleDegrees();
+    double clamped = Math.max(PIVOT_UP_DEGREES, Math.min(PIVOT_DOWN_DEGREES, currentAngle));
+    intakePivotController.setPosition(Degrees.of(clamped));
+  }
+
+  /** @deprecated Use manualDrive(duty) and lockPosition(). */
+  public void setPivotDutyCycleWithLimits(double duty) {
+    manualDrive(duty);
   }
 
   /**

@@ -106,15 +106,15 @@ public class OperatorControls {
     //         .ignoringDisable(true)
     //         .withName("OperatorControls.aimCommand")); // disabled: double binding; RB = ManualTest.IntakeRollers only
 
-    // Intake pivot: manuel sabit güç; D-Pad Yukarı/Aşağı basılı = yukarı/aşağı, bırakınca dur
-    controller.povUp().whileTrue(
-        Commands.run(() -> superstructure.intake.setPivotDutyCycleWithLimits(IntakeSubsystem.PIVOT_UP_DUTY), superstructure.intake)
-            .finallyDo(() -> superstructure.intake.setPivotDutyCycleWithLimits(0))
-            .withName("OperatorControls.IntakePivotUp"));
+    // Intake pivot: dinamik setpoint — basılı = manualDrive, bırakınca lockPosition (o açıda kilitle)
     controller.povDown().whileTrue(
-        Commands.run(() -> superstructure.intake.setPivotDutyCycleWithLimits(IntakeSubsystem.PIVOT_DOWN_DUTY), superstructure.intake)
-            .finallyDo(() -> superstructure.intake.setPivotDutyCycleWithLimits(0))
+        Commands.run(() -> superstructure.intake.manualDrive(IntakeSubsystem.PIVOT_DOWN_DUTY), superstructure.intake)
+            .finallyDo(superstructure.intake::lockPosition)
             .withName("OperatorControls.IntakePivotDown"));
+    controller.povUp().whileTrue(
+        Commands.run(() -> superstructure.intake.manualDrive(IntakeSubsystem.PIVOT_UP_DUTY), superstructure.intake)
+            .finallyDo(superstructure.intake::lockPosition)
+            .withName("OperatorControls.IntakePivotUp"));
     // Top alma: RB = Intake roller içeri; bırakınca dur
     controller.rightBumper().whileTrue(
         superstructure.intake.intakeCommand().withName("OperatorControls.IntakeRoller"));

@@ -108,15 +108,15 @@ public class DriverControls {
           superstructure.backFeedAllCommand()
               .finallyDo(() -> superstructure.stopFeedingAllCommand().schedule()));
 
-      // Intake pivot: software-limited voltage control (no PID oscillation); release = stop motor
-      controller.povUp().whileTrue(
-          Commands.run(() -> superstructure.intake.setPivotDutyCycleWithLimits(IntakeSubsystem.PIVOT_UP_DUTY), superstructure.intake)
-              .finallyDo(() -> superstructure.intake.setPivotDutyCycleWithLimits(0))
-              .withName("DriverControls.IntakePivotUp"));
+      // Intake pivot: dinamik setpoint — basılı = manualDrive, bırakınca lockPosition (o açıda kilitle)
       controller.povDown().whileTrue(
-          Commands.run(() -> superstructure.intake.setPivotDutyCycleWithLimits(IntakeSubsystem.PIVOT_DOWN_DUTY), superstructure.intake)
-              .finallyDo(() -> superstructure.intake.setPivotDutyCycleWithLimits(0))
+          Commands.run(() -> superstructure.intake.manualDrive(IntakeSubsystem.PIVOT_DOWN_DUTY), superstructure.intake)
+              .finallyDo(superstructure.intake::lockPosition)
               .withName("DriverControls.IntakePivotDown"));
+      controller.povUp().whileTrue(
+          Commands.run(() -> superstructure.intake.manualDrive(IntakeSubsystem.PIVOT_UP_DUTY), superstructure.intake)
+              .finallyDo(superstructure.intake::lockPosition)
+              .withName("DriverControls.IntakePivotUp"));
     }
   }
 
