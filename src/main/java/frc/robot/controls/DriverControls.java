@@ -81,17 +81,14 @@ public class DriverControls {
           .whileTrue(superstructure.setIntakeDeployAndRoll().withName("DriverControls.intakeDeployed"));
       controller.leftBumper().onFalse(superstructure.retractIntakeUpCommand());
 
-      // Akıllı atış: tetikte Shooter hemen, 1 saniye sonra Hopper+Kicker; bırakınca hepsi dur
+      // Sürücü RT = SADECE atış makrosu: Shooter hemen, 1 sn bekle, sonra Hopper+Kicker paralel; bırakınca hepsi dur
       controller.rightTrigger().whileTrue(
-          Commands.parallel(
-              Commands.sequence(
-                  superstructure.shooter.spinUpMatchSpeed(),
-                  Commands.waitForever()),
-              Commands.sequence(
-                  Commands.waitSeconds(1.0),
-                  Commands.parallel(
-                      superstructure.hopper.feedCommand(),
-                      superstructure.kicker.feedCommand())))
+          Commands.sequence(
+              superstructure.shooter.spinUpMatchSpeed(),
+              Commands.waitSeconds(1.0),
+              Commands.parallel(
+                  superstructure.hopper.feedCommand(),
+                  superstructure.kicker.feedCommand()))
               .finallyDo(() -> {
                 superstructure.shooter.stop().schedule();
                 superstructure.hopper.stopCommand().schedule();

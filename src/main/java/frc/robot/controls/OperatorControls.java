@@ -69,9 +69,13 @@ public class OperatorControls {
     // REAL CONTROLS
     controller.start().onTrue(superstructure.rezeroIntakePivotAndTurretCommand().ignoringDisable(true));
 
-    // Taret manuel test: tetikler çok düşük adımla (0.05°) sağa/sola; bırakınca dur
-    controller.rightTrigger().whileTrue(superstructure.turret.addAngle(Degrees.of(0.05)));
-    controller.leftTrigger().whileTrue(superstructure.turret.addAngle(Degrees.of(-0.05)));
+    // Taret manuel test: RT sağa, LT sola (0.05°); bırakınca motor ANINDA dur (set(0))
+    controller.rightTrigger().whileTrue(
+        superstructure.turret.addAngle(Degrees.of(0.05))
+            .finallyDo(() -> superstructure.turret.set(0).schedule()));
+    controller.leftTrigger().whileTrue(
+        superstructure.turret.addAngle(Degrees.of(-0.05))
+            .finallyDo(() -> superstructure.turret.set(0).schedule()));
 
     controller.leftBumper()
         .whileTrue(superstructure.setIntakeDeployAndRoll().withName("OperatorControls.intakeDeployed"));

@@ -38,8 +38,8 @@ import yams.motorcontrollers.local.SparkWrapper;
 
 public class IntakeSubsystem extends SubsystemBase {
 
-  // Reduced from 1.0 for safe initial testing with NEO — scale up after verifying
-  private static final double INTAKE_SPEED = 0.6;
+  // Intake roller/pivot güçleri yarıya düşürüldü (motor koruma)
+  private static final double INTAKE_SPEED = 0.3;
 
   /** Pivot runs down for this long when button held; physical stop limits travel at bottom. */
   private static final double DEPLOY_DOWN_SECONDS = 5.0;
@@ -55,10 +55,10 @@ public class IntakeSubsystem extends SubsystemBase {
   private static final double PIVOT_LOCK_kP = 0.05;
   /** Smart current limit (A) when pressing on ball. */
   private static final int PIVOT_SMART_CURRENT_LIMIT = 25;
-  /** Manual drive duty: down. */
-  public static final double PIVOT_DOWN_DUTY = -0.20;
+  /** Manual drive duty: down (düşük güç, mekanizma koruma). */
+  public static final double PIVOT_DOWN_DUTY = -0.10;
   /** Manual drive duty: up. */
-  public static final double PIVOT_UP_DUTY = 0.30;
+  public static final double PIVOT_UP_DUTY = 0.15;
 
   private SparkMax rollerSpark = new SparkMax(Constants.IntakeConstants.kRollerMotorId, MotorType.kBrushless);
 
